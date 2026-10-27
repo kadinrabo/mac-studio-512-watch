@@ -56,7 +56,11 @@ def main():
         notify("512GB Mac Studio is orderable", msg + " Tap to open the Apple Store.", "urgent")
         return 2
     if state == "unknown":
-        notify("Mac Studio page changed", msg, "high")
+        # runs every 5 minutes; only push about a page change once an hour
+        if datetime.datetime.now(datetime.timezone.utc).minute < 5:
+            notify("Mac Studio page changed", msg, "high")
+        else:
+            print(msg)
         return 3
     print(msg)
     return 0

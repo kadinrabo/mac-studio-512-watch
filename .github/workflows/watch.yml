@@ -2,7 +2,7 @@ name: Watch for 512GB Mac Studio
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may delay scheduled runs a little)
+    - cron: "*/5 * * * *"    # every 5 minutes (GitHub may delay or drop some scheduled runs when busy)
   workflow_dispatch: {}
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
           python3 watch.py
           code=$?
           echo "code=$code" >> "$GITHUB_OUTPUT"
-          # 3 = fetch failed or page changed: fail the run so GitHub emails you, but keep watching
+          # 3 = fetch failed or page changed: fail the run (GitHub emails once per failing streak), keep watching
           [ "$code" = "3" ] && exit 1
           exit 0
       - name: Stop watching once it's orderable
