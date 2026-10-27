@@ -1,0 +1,37 @@
+name: Watch for 512GB Mac Studio
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may delay scheduled runs a little)
+  workflow_dispatch: {}
+
+permissions:
+  actions: write   # lets the job switch itself off once 512GB shows up
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Apple Store
+        id: check
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          END_DATE: "2026-11-02"
+        run: |
+          set +e
+          python3 watch.py
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          # 3 = fetch failed or page changed: fail the run so GitHub emails you, but keep watching
+          [ "$code" = "3" ] && exit 1
+          exit 0
+      - name: Stop watching once it's orderable
+        if: steps.check.outputs.code == '2'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow disable "${{ github.workflow }}" --repo "${{ github.repository }}"
+          echo "512GB Mac Studio is orderable: https://www.apple.com/shop/buy-mac/mac-studio"
+          exit 1   # fail on purpose so GitHub also emails you
