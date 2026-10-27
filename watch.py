@@ -4,7 +4,8 @@
 No AI involved: it fetches the page, reads the memory options Apple's configurator
 lists, and sends a push notification through ntfy.sh when 512GB appears.
 
-Exit codes: 0 = still coming (or past the end date), 2 = 512GB is orderable, 3 = page changed / fetch failed.
+Exit codes: 0 = still coming (or past the end date), 2 = 512GB is orderable,
+3 = page changed / fetch failed (reported, at most hourly), 4 = same but not reported this run.
 Env: NTFY_TOPIC (optional; notifications go to https://ntfy.sh/<topic>), END_DATE (YYYY-MM-DD, default 2026-11-02).
 """
 import datetime
@@ -49,9 +50,9 @@ def main():
         return 0
     try:
         state, msg = check()
-    except Exception as e:  # network hiccup or Apple blocking a request
+    except Exception as e:  # network hiccup or Apple blocking a request; only escalate once an hour
         print(f"fetch failed: {e}")
-        return 3
+        return 3 if datetime.datetime.now(datetime.timezone.utc).minute < 5 else 4
     if state == "available":
         notify("512GB Mac Studio is orderable", msg + " Tap to open the Apple Store.", "urgent")
         return 2
@@ -59,9 +60,9 @@ def main():
         # runs every 5 minutes; only push about a page change once an hour
         if datetime.datetime.now(datetime.timezone.utc).minute < 5:
             notify("Mac Studio page changed", msg, "high")
-        else:
-            print(msg)
-        return 3
+            return 3
+        print(msg)
+        return 4
     print(msg)
     return 0
 
