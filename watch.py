@@ -25,7 +25,8 @@ def notify(title, message, priority="default"):
         return
     req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=message.encode(), method="POST",
                                  headers={"Title": title, "Priority": priority, "Click": URL, "Tags": "computer"})
-    urllib.request.urlopen(req, timeout=20).read()
+    with urllib.request.urlopen(req, timeout=20) as r:
+        print(f"ntfy: HTTP {r.status}")
 
 
 def check():
@@ -44,6 +45,9 @@ def check():
 
 
 def main():
+    if "--test" in sys.argv:
+        notify("Mac Studio watcher is live", "Test alert. You'll get an urgent push here when the 512GB M5 Ultra becomes orderable.")
+        return 0
     end = datetime.date.fromisoformat(os.environ.get("END_DATE", "2026-11-02"))
     if datetime.date.today() > end:
         print(f"Past end date {end}; not checking.")

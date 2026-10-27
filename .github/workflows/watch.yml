@@ -3,7 +3,12 @@ name: Watch for 512GB Mac Studio
 on:
   schedule:
     - cron: "*/5 * * * *"    # every 5 minutes (GitHub may delay or drop some scheduled runs when busy)
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test notification instead of checking"
+        type: boolean
+        default: false
 
 permissions:
   actions: write   # lets the job switch itself off once 512GB shows up
@@ -21,6 +26,7 @@ jobs:
           END_DATE: "2026-11-02"
         run: |
           set +e
+          if [ "${{ inputs.test }}" = "true" ]; then python3 watch.py --test; exit $?; fi
           python3 watch.py
           code=$?
           echo "code=$code" >> "$GITHUB_OUTPUT"
