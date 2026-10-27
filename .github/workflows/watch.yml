@@ -1,43 +1,60 @@
 name: Watch for 512GB Mac Studio
 
+# One long run checks every 5 minutes for ~5h45m, then starts the next run itself.
+# The hourly schedule is only a backup that restarts the loop if it ever stops.
 on:
-  schedule:
-    - cron: "*/5 * * * *"    # every 5 minutes (GitHub may delay or drop some scheduled runs when busy)
   workflow_dispatch:
     inputs:
-      test:
-        description: "Send a test notification instead of checking"
+      announce:
+        description: "Send a 'watcher is running' push when this run starts"
         type: boolean
         default: false
+      test:
+        description: "Only send a test notification"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 * * * *"
 
 permissions:
-  actions: write   # lets the job switch itself off once 512GB shows up
+  actions: write   # to start the next run, and switch off once 512GB shows up
+
+env:
+  NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'mac-studio-512-780fbd66bfb1' }}   # repo secret wins if you add one
+  END_DATE: "2026-11-02"
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
-  check:
+  watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
-      - name: Check Apple Store
-        id: check
+      - name: Skip if a watcher run is already going (backup schedule only)
+        id: guard
+        run: |
+          busy=$(gh api "repos/${{ github.repository }}/actions/workflows/watch.yml/runs?status=in_progress" \
+                 --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }})] | length')
+          echo "busy=$busy" >> "$GITHUB_OUTPUT"
+          [ "$busy" != "0" ] && echo "Another watcher run is active; this one exits." || true
+      - name: Test notification
+        if: inputs.test
+        run: python3 watch.py --test
+      - name: Watch (every 5 minutes)
+        id: loop
+        if: steps.guard.outputs.busy == '0' && !inputs.test
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'mac-studio-512-780fbd66bfb1' }}   # repo secret wins if you add one
-          END_DATE: "2026-11-02"
+          ANNOUNCE: ${{ inputs.announce && 'true' || 'false' }}
         run: |
           set +e
-          if [ "${{ inputs.test }}" = "true" ]; then python3 watch.py --test; exit $?; fi
-          python3 watch.py
-          code=$?
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          # 3 = fetch failed or page changed: fail the run (GitHub emails once per failing streak), keep watching
-          [ "$code" = "3" ] && exit 1
-          exit 0
-      - name: Stop watching once it's orderable
-        if: steps.check.outputs.code == '2'
-        env:
-          GH_TOKEN: ${{ github.token }}
+          python3 loop.py
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+      - name: Start the next run
+        if: steps.loop.outputs.code == '0'
+        run: gh api -X POST "repos/${{ github.repository }}/actions/workflows/watch.yml/dispatches" -f ref=main
+      - name: Switch off once 512GB is orderable
+        if: steps.loop.outputs.code == '2'
         run: |
-          gh workflow disable "${{ github.workflow }}" --repo "${{ github.repository }}"
+          gh workflow disable watch.yml --repo "${{ github.repository }}"
           echo "512GB Mac Studio is orderable: https://www.apple.com/shop/buy-mac/mac-studio"
           exit 1   # fail on purpose so GitHub also emails you

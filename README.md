@@ -1,6 +1,6 @@
 # Mac Studio 512GB watcher
 
-Checks https://www.apple.com/shop/buy-mac/mac-studio every 5 minutes until 2026-11-02 and sends a phone
+Checks https://www.apple.com/shop/buy-mac/mac-studio every 5 minutes (one long Actions run that restarts itself every ~6 hours) until 2026-11-02 and sends a phone
 notification (via the free [ntfy](https://ntfy.sh) app) when the 512GB M5 Ultra memory option becomes orderable.
 Uses no AI at all.
 
