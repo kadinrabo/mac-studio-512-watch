@@ -1,6 +1,6 @@
 name: Watch for 512GB Mac Studio
 
-# One long run checks every 5 minutes for ~5h45m, then starts the next run itself.
+# One long run checks every 5 minutes (Best Buy every 30) for ~5h45m, then starts the next run itself.
 # The hourly schedule is only a backup that restarts the loop if it ever stops.
 on:
   workflow_dispatch:
@@ -17,11 +17,13 @@ on:
     - cron: "23 * * * *"
 
 permissions:
-  actions: write   # to start the next run, and switch off once 512GB shows up
+  actions: write   # to start the next run
 
 env:
   NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'mac-studio-512-780fbd66bfb1' }}   # repo secret wins if you add one
-  END_DATE: "2026-11-02"
+  END_DATE: "2026-11-02"       # Mac Studio watch ends (used by watch.py --test too)
+  MAC_END_DATE: "2026-11-02"
+  TV_END_DATE: "2026-11-30"    # Cyber Monday
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -40,6 +42,12 @@ jobs:
       - name: Test notification
         if: inputs.test
         run: python3 watch.py --test
+      - name: Restore state from the previous run
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: watch-state-${{ github.run_id }}
+          restore-keys: watch-state-
       - name: Watch (every 5 minutes)
         id: loop
         if: steps.guard.outputs.busy == '0' && !inputs.test
@@ -49,12 +57,12 @@ jobs:
           set +e
           python3 loop.py
           echo "code=$?" >> "$GITHUB_OUTPUT"
+      - name: Save state for the next run
+        if: always() && steps.loop.outcome != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: watch-state-${{ github.run_id }}
       - name: Start the next run
         if: steps.loop.outputs.code == '0'
         run: gh api -X POST "repos/${{ github.repository }}/actions/workflows/watch.yml/dispatches" -f ref=main
-      - name: Switch off once 512GB is orderable
-        if: steps.loop.outputs.code == '2'
-        run: |
-          gh workflow disable watch.yml --repo "${{ github.repository }}"
-          echo "512GB Mac Studio is orderable: https://www.apple.com/shop/buy-mac/mac-studio"
-          exit 1   # fail on purpose so GitHub also emails you

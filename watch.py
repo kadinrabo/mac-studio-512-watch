@@ -18,13 +18,13 @@ URL = "https://www.apple.com/shop/buy-mac/mac-studio"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
 
-def notify(title, message, priority="default"):
+def notify(title, message, priority="default", click=URL):
     topic = os.environ.get("NTFY_TOPIC")
     print(f"{title}: {message}")
     if not topic:
         return
     req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=message.encode(), method="POST",
-                                 headers={"Title": title, "Priority": priority, "Click": URL, "Tags": "computer"})
+                                 headers={"Title": title, "Priority": priority, "Click": click, "Tags": "computer"})
     with urllib.request.urlopen(req, timeout=20) as r:
         print(f"ntfy: HTTP {r.status}")
 
