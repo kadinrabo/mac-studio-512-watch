@@ -58,11 +58,12 @@ jobs:
           python3 loop.py
           echo "code=$?" >> "$GITHUB_OUTPUT"
       - name: Save state for the next run
-        if: always() && steps.loop.outcome != 'skipped'
+        if: always() && steps.loop.conclusion != 'skipped'
         uses: actions/cache/save@v4
         with:
           path: state
           key: watch-state-${{ github.run_id }}
       - name: Start the next run
-        if: steps.loop.outputs.code == '0'
+        # only after a real loop run: a skipped step's empty output compares equal to '0' in GitHub expressions
+        if: steps.loop.outcome == 'success' && steps.loop.outputs.code == '0'
         run: gh api -X POST "repos/${{ github.repository }}/actions/workflows/watch.yml/dispatches" -f ref=main
